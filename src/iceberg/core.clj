@@ -1,2 +1,1 @@
-(ns iceberg.core
-  (:use [iceberg.file]))
+(ns iceberg.core)
