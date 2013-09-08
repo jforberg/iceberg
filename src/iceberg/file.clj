@@ -3,10 +3,14 @@
   (:import [java.security MessageDigest DigestInputStream]
            [java.io FileInputStream File]))
 
-(declare build-map build-dir build-file calc-hash path-join)
-
 (defrecord FileProp [size    mtime   hash])
-;;                   Integer Integer Byte[]
+;                    Integer Integer Byte[]
+
+;; Filesystem model: Directories are keys a flat hash-map. Each directory
+;; is then a hash-map with filenames as keys. Behind these are FileProp 
+;; records describing some properties of each file, used for comparisons. 
+
+(declare build-map build-dir build-file calc-hash path-join)
 
 (defn build-map [path]
   (reduce conj {}
@@ -21,13 +25,25 @@
   
 (defn build-file [file]
   (hash-map (.getName file)
-            (FileProp. (fs/size file) (fs/mod-time file) (calc-hash file))))
+            (FileProp. (fs/size file) (fs/mod-time file) nil)))
 
 (defn calc-hash [file]
   (let [stream (DigestInputStream. (FileInputStream. file)
                                    (MessageDigest/getInstance "SHA-1"))]
     (while (not= -1 (.read stream)))
     (.digest (.getMessageDigest stream))))
+
+(defn lookup-file [tree path]
+  (let [file (as-file path)
+        dir  (.getParent file)
+        base (.getName file)]
+    (get (get tree (as-file dir))
+         base)))
   
 (defn path-join [root base]
-  (File. root base))
+  (File. (as-file root) base))
+
+(defn as-file [maybe-file]
+  (if (instance? File maybe-file)
+    maybe-file
+    (File. maybe-file)))
