@@ -10,7 +10,8 @@
 ;; is then a hash-map with filenames as keys. Behind these are FileProp 
 ;; records describing some properties of each file, used for comparisons. 
 
-(declare build-map build-dir build-file calc-hash path-join)
+(declare build-map build-dir build-file calc-hash lookup-file path-join 
+         as-file)
 
 (defn build-map [path]
   (reduce conj {}
