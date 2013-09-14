@@ -7,10 +7,9 @@
   (:import [java.util Date]))
 
 (declare signed-request auth-header signature signing-key string-to-sign
-         req-hash canonical-request canonical-path canonical-query
-         canonical-headers signed-headers rewrite-headers parse-query
-         uri-encode uri-escape cred-scope extract-region iso8601-datetime
-         iso8601-date)
+         canonical-request canonical-path canonical-query canonical-headers
+         signed-headers rewrite-headers parse-query uri-encode uri-escape
+         cred-scope extract-region iso8601-datetime iso8601-date)
 
 ;;; The only interesting function in this module. Takes a request, does all 
 ;;; the stuff needed to sign it, and puts the signature in as a header.
@@ -34,7 +33,8 @@
 
 (defn signature [req sec-key]
   (util/hex-enc 
-    (util/sha256mac (signing-key req sec-key) (string-to-sign req))))
+    (util/sha256mac (signing-key req sec-key) 
+                    (string-to-sign req))))
 
 (defn signing-key [req sec-key]
   (let [mac util/sha256mac]
@@ -42,9 +42,10 @@
       (mac
         (mac
           (mac 
-            (str "AWS4" sec-key (iso8601-date (req :date))))
-          (extract-region (req :server-name)))
-        "glacier")
+            (str "AWS4" sec-key) 
+            (iso8601-date (req :date)))
+          (or (req :aws-region) (extract-region (req :server-name))))
+        (or (req :aws-service) "glacier"))
       "aws4_request")))
 
 (defn string-to-sign [req]
@@ -120,7 +121,7 @@
 (defn uri-escape [strc]
   (apply str 
     (map #(format "%%%02X" %)
-          (.getBytes strc "UTF-8"))))
+          (util/utf8-decode strc))))
 
 (defn cred-scope
   ([req k]
@@ -130,8 +131,10 @@
   ([req]
     (string/join "/"
                  [(iso8601-date (req :date))
-                  (extract-region (req :server-name))
-                  "glacier"
+                  (or (req :aws-region)
+                      (extract-region (req :server-name)))
+                  (or (req :aws-service)
+                      "glacier")
                   "aws4_request"])))
 
 (defn extract-region [host]
