@@ -1,9 +1,11 @@
 (ns iceberg.util
   (:import [java.util Date TimeZone]
            [java.text SimpleDateFormat]
-           [java.security MessageDigest]))
+           [java.security MessageDigest]
+           [javax.crypto Mac]
+           [javax.crypto.spec SecretKeySpec]))
 
-(declare valmap strftime hej)
+(declare valmap strftime sha256 sha256mac hex-enc)
 
 (defn valmap [f hmap]
     (reduce (fn [acc x]
@@ -17,8 +19,19 @@
     (.format formatter date)))
 
 (defn sha256 [^String s]
-  (let [bts (.getBytes s "utf-8")
-        algo (MessageDigest/getInstance "SHA-256")
-        dig (.digest algo bts)]
-    (apply str (map #(format "%02x" %) dig))))
+  (if (nil? s)
+    (sha256 "")
+    (let [bts (.getBytes s "utf-8")
+          algo (MessageDigest/getInstance "SHA-256")
+          dig (.digest algo bts)]
+      (hex-enc dig))))
+
+(defn sha256mac [k msg]
+  (let [algo "HmacSHA256"
+        mac (doto (Mac/getInstance algo)
+              (.init (SecretKeySpec. k algo)))]
+    (.doFinal mac msg)))
+
+(defn hex-enc [bts]
+  (apply str (map #(format "%02x" %) bts)))
 
