@@ -9,6 +9,28 @@
   (fact "Handles numeric map"
     (util/valmap inc {:a 1 :b 2 :c 3}) => {:a 2 :b 3 :c 4})))
 
+(facts "about `rec-merge`"
+  (fact "Handles empty maps"
+    (util/rec-merge {} {}) => {})
+  (fact "Handles non-recursive case"
+    (util/rec-merge {:a 1 :b 2} {:a 2 :c 3}) => {:a 2 :b 2 :c 3})
+  (fact "Handles recursive case"
+    (util/rec-merge {:a 1 :b {:ba 1}} {:b {:bb 2}}) => {:a 1 :b {:ba 1 :bb 2}}))
+
+(facts "about `select`"
+  (fact "Handles empty map"
+    (util/select {} []) => {})
+  (fact "Handles non-empty example"
+    (util/select {:a 1 :b 2 :c 3} [:a :b]) => {:a 1 :b 2}))
+
+(facts "about `uri`"
+  (fact "Handles nullary call"
+    (util/uri) => "/")
+  (fact "Handles one arg"
+    (util/uri "foo") => "/foo")
+  (fact "Handles several args"
+    (util/uri "foo" "bar" "baz" "quux") => "/foo/bar/baz/quux")) 
+
 (facts "about `strftime`"
   (fact "Handles epoch, iso8601 format"
     (util/strftime "yyyyMMdd'T'HHmmss'Z'" (Date. 0)) => "19700101T000000Z"))

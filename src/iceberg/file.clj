@@ -44,6 +44,9 @@
 (defn path-join [root base]
   (File. (as-file root) base))
 
+(defn paths-join [paths]
+  (reduce path-join paths))
+
 (defn as-file [maybe-file]
   (if (instance? File maybe-file)
     maybe-file

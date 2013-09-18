@@ -38,15 +38,21 @@
      {:content-type "application/x-www-form-urlencoded; charset=utf-8"}
    :body "Action=ListUsers&Version=2010-05-08"})
 
+(def example-acct
+  {:number nil 
+   :region nil 
+   :keyid "AKIAIOSFODNN7EXAMPLE" 
+   :apikey "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY"})
+
 (facts "about `signature`"
   (fact "Handles amazon example"
-    (auth/signature example-request-2 "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY")
-        => "ced6826de92d2bdeed8f846f0bf508e8559e98e4b0199114b84c54174deb456c"))
+    (auth/signature example-request-2 example-acct)
+       => "ced6826de92d2bdeed8f846f0bf508e8559e98e4b0199114b84c54174deb456c"))
 
 (facts "about `signing-key`"
   (fact "Handles amazon example"
     (util/hex-enc
-      (auth/signing-key example-request-2 "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY"))
+      (auth/signing-key example-request-2 example-acct))
        => "98f1d889fec4f4421adc522bab0ce1f82e6929c262ed15e5a94c90efd1e3b0e7"))
 
 (facts "about `string-to-sign`"
@@ -106,6 +112,14 @@
       (auth/uri-encode unres) => unres))
   (fact "Unicode chars are correctly escaped"
     (auth/uri-encode "å-ä-ö") => "%C3%A5-%C3%A4-%C3%B6"))
+
+(facts "about `cred-scope`"
+  (fact "Handles unary case"
+    (auth/cred-scope example-request-1) 
+        => "20120525/us-east-1/glacier/aws4_request")
+  (fact "Handles binary case"
+    (auth/cred-scope example-request-1 example-acct)
+        => "AKIAIOSFODNN7EXAMPLE/20120525/us-east-1/glacier/aws4_request"))
 
 (facts "about `extract-region`"
   (fact "Handles bogus domain"

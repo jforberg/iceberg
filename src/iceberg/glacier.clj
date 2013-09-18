@@ -1,9 +1,11 @@
 (ns iceberg.glacier
   (:require [iceberg.util :as util]
+            [iceberg.auth :as auth]
             [clojure.string :as string]
-            [clj-http.client :as client]))
+            [clj-http.client :as http])
+  (:import [java.util Date]))
 
-(declare glacier-version glacier-endpoints)
+(declare glacier-version glacier-endpoints list-vaults-req create-req validate-req)
 
 (def glacier-version  "2012-06-01")
 
@@ -16,5 +18,30 @@
      :ireland    "eu-west-1"
      :tokyo      "ap-northeast-1"}))
 
-(defrecord vault [account region name]) 
+(defn list-vaults-req [acct]
+  (create-req acct
+              {:method :get
+               :uri (util/uri (:id acct) "vaults")}))
+
+(defn perform-req [req]
+  (http/request))
+
+(defn create-req [acct base-req]
+  (let [content-length (if (nil? (:body base-req))
+                         0
+                         (count (util/utf8-encode (:body base-req))))]
+    (validate-req
+      (auth/sign-request 
+        (util/rec-merge
+          {:server-name ((:region acct) glacier-endpoints)
+           :date (Date.)
+           :headers
+             {:content-length content-length
+              :x-amz-glacier-version glacier-version}
+           :body ""}
+          base-req)
+        (:apikey acct)))))
+
+(defn validate-req [req]
+  req)
 
