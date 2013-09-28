@@ -10,15 +10,13 @@
          signed-headers rewrite-headers parse-query uri-encode uri-escape
          cred-scope extract-region iso8601-datetime iso8601-date)
 
-(defrecord account [number region keyid apikey])
-
 ;;; The only interesting function in this module. Takes a request, does all 
 ;;; the stuff needed to sign it, and puts the signature in as a header.
 (defn sign-request [req acct]
   "Add the proper Authorization header to a Glacier request."
   (assoc req
          :headers
-         (merge (:headers req)
+         (merge (req :headers)
                 {:authorization (auth-header req acct)})))
 
 ;;; The rest is just helper functions for `signed-request`.
@@ -48,29 +46,29 @@
         (mac
           (mac 
             (str "AWS4" (:apikey acct)) 
-            (iso8601-date (:date req)))
-          (or (:aws-region req) (extract-region (:server-name req))))
-        (or (:aws-service req) "glacier"))
+            (iso8601-date (req :date)))
+          (or (req :aws-region) (extract-region (req :server-name))))
+        (or (req :aws-service) "glacier"))
       "aws4_request")))
 
 (defn string-to-sign [req]
   "Calculate the AWS4 `string-to-sign` for a request."
   (string/join "\n"
                ["AWS4-HMAC-SHA256"
-                (iso8601-datetime (:date req))
+                (iso8601-datetime (req :date))
                 (cred-scope req)
                 (util/sha256 (canonical-request req))]))
 
 (defn canonical-request [req]
   "Arrange a request into AWS4 `canonical form`."
   (string/join "\n"
-    [(string/upper-case (name (:request-method req)))
-     (canonical-path (:uri req))
-     (canonical-query (:query-string req))
+    [(string/upper-case (name (req :request-method)))
+     (canonical-path (req :uri))
+     (canonical-query (req :query-string))
      (canonical-headers req)
      ""
      (string/join ";" (signed-headers req))
-     (util/sha256 (:body req))]))
+     (util/sha256 (req :body))]))
 
 (defn canonical-path [uri]
   "Arrange a uri into AWS4 `canonical form`."
@@ -105,8 +103,8 @@
 
 (defn rewrite-headers [req]
   "Rewrite the headers of a request for signing."
-  (merge (:headers req)
-         {:host (:server-name req)
+  (merge (req :headers)
+         {:host (req :server-name)
           :x-amz-date (iso8601-datetime (req :date))}))
  
 (defn parse-query [query]
@@ -146,10 +144,10 @@
                   (cred-scope req)]))
   ([req]
     (string/join "/"
-                 [(iso8601-date (:date req))
-                  (or (:aws-region req)
-                      (extract-region (:server-name req)))
-                  (or (:aws-service req)
+                 [(iso8601-date (req :date))
+                  (or (req :aws-region)
+                      (extract-region (req :server-name)))
+                  (or (req :aws-service)
                       "glacier")
                   "aws4_request"])))
 

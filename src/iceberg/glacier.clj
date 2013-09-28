@@ -5,7 +5,8 @@
             [clj-http.client :as http])
   (:import [java.util Date]))
 
-(declare glacier-version glacier-endpoints list-vaults-req create-req validate-req)
+(declare glacier-version glacier-endpoints list-vaults-req create-req
+         process-req validate-req)
 
 (def glacier-version  "2012-06-01")
 
@@ -21,26 +22,40 @@
 (defn list-vaults-req [acct]
   (create-req acct
               {:method :get
-               :uri (util/uri (:id acct) "vaults")}))
+               :uri (util/uri (:number acct) "vaults")}))
 
 (defn perform-req [req]
   (http/request))
 
 (defn create-req [acct base-req]
-  (let [content-length (if (nil? (:body base-req))
-                         0
-                         (count (util/utf8-encode (:body base-req))))]
-    (validate-req
-      (auth/sign-request 
+  (validate-req
+    (auth/sign-request 
+      (process-req
         (util/rec-merge
           {:server-name ((:region acct) glacier-endpoints)
-           :date (Date.)
            :headers
-             {:content-length content-length
-              :x-amz-glacier-version glacier-version}
+           :date (Date.)
+              {:x-amz-glacier-version glacier-version}
            :body ""}
           base-req)
         (:apikey acct)))))
+
+(defn process-req [req]
+  (-> req
+    (assoc :url (str (name (:scheme)) 
+                     "://"
+                     (:server-name req)
+                     (:server-port req)
+                     (:uri req)
+                     (:query-string req)))
+    (assoc :headers
+           {:x-amz-date (auth/iso8601-datetime (:date req))
+            :content-length (or (:content-length req)
+                                (count (util/utf8-encode (:body req))))})))
+  
+; (let [content-length (if (nil? (:body req))
+;                         0
+;                        (count (util/utf8-encode (:body req))))]
 
 (defn validate-req [req]
   req)
