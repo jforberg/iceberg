@@ -1,36 +1,18 @@
-# iceberg
+# Iceberg
+*A client for Amazon Glacier, in Clojure*
 
-FIXME: description
+Iceberg is a Clojure library and command-line client for the Amazon Glacier backup service. 
 
-## Installation
+## What it should be able to do
 
-Download from http://example.com/FIXME.
+* Perform unidirectional backups to Glacier.
+* Encryption. 
+* Restore a backup only from what is stored at Glacier.
+* Have a stable protocol/API (so that backups can be reliably restored).
 
-## Usage
+## What it can currently do
 
-FIXME: explanation
+* Not very much.
+* Authentication using Amazon's strange scheme.
 
-    $ java -jar iceberg-0.1.0-standalone.jar [args]
-
-## Options
-
-FIXME: listing of options this app accepts.
-
-## Examples
-
-...
-
-### Bugs
-
-...
-
-### Any Other Sections
-### That You Think
-### Might be Useful
-
-## License
-
-Copyright © 2013 FIXME
-
-Distributed under the Eclipse Public License either version 1.0 or (at
-your option) any later version.
+Copyright © 2013 Johan Förberg <johan@forberg.se>
