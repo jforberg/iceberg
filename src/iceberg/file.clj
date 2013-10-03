@@ -40,7 +40,9 @@
   (File. (as-file root) base))
 
 (defn paths-join [paths]
-  (reduce path-join "" paths))
+  (if (empty? paths)
+    (File. "")
+    (reduce path-join paths)))
 
 (defn as-file [maybe-file]
   (if (instance? File maybe-file)
