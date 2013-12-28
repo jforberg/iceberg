@@ -134,7 +134,7 @@
   "URI-escape a character, if necessary."
   (apply str 
     (map #(format "%%%02X" %)
-          (util/utf8-decode strc))))
+          (util/utf8-encode strc))))
 
 (defn cred-scope
   "Get the `scope` of a signature."

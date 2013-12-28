@@ -5,58 +5,60 @@
             [clj-http.client :as http])
   (:import [java.util Date]))
 
-(declare glacier-version glacier-endpoints list-vaults-req create-req
-         process-req validate-req)
+(declare glacier-version glacier-endpoints basic-request list-vaults fire-req
+         create-req validate encode-body add-date set-endpoint)
 
 (def glacier-version  "2012-06-01")
 
 (def glacier-endpoints
   (util/valmap #(string/replace "glacier.*.amazonaws.com" "*" %)
-    ; from http://docs.aws.amazon.com/general/latest/gr/rande.html#glacier_region
+    ;; from http://docs.aws.amazon.com/general/latest/gr/rande.html#glacier_region
     {:virginia   "us-east-1"
      :oregon     "us-west-2"
      :california "us-west-1"
      :ireland    "eu-west-1"
      :tokyo      "ap-northeast-1"}))
 
-(defn list-vaults-req [acct]
+(def basic-request
+  ;; The template is modelled on Ring request maps. Some differences.
+  ;; nil values here must be overriden before the request is made.
+  {:request-method nil   ; :get, :post, :put
+   :server-name    nil   ; "glacier.xxx.amazonaws.com"
+   :uri            nil   ; "/", "/vaults", ...
+   :query-string   ""    ; Any query.
+   :scheme         :http ; Temporary, should be HTTPS before we're finished.
+   :headers              ; Any additional headers: signature, content-length etc.
+     {:x-amz-glacier-version glacier-version} ; The version of the protocol.
+   :body           ""})  ; Payload as string.
+
+(defn list-vaults [acct]
   (create-req acct
               {:method :get
                :uri (util/uri (:number acct) "vaults")}))
 
-(defn perform-req [req]
-  (http/request))
+(defn fire-req [req-template]
+  (http/request (create-req req-template)))
 
-(defn create-req [acct base-req]
-  (validate-req
-    (auth/sign-request 
-      (process-req
-        (util/rec-merge
-          {:server-name ((:region acct) glacier-endpoints)
-           :headers
-           :date (Date.)
-              {:x-amz-glacier-version glacier-version}
-           :body ""}
-          base-req)
-        (:apikey acct)))))
-
-(defn process-req [req]
-  (-> req
-    (assoc :url (str (name (:scheme)) 
-                     "://"
-                     (:server-name req)
-                     (:server-port req)
-                     (:uri req)
-                     (:query-string req)))
-    (assoc :headers
-           {:x-amz-date (auth/iso8601-datetime (:date req))
-            :content-length (or (:content-length req)
-                                (count (util/utf8-encode (:body req))))})))
-  
-; (let [content-length (if (nil? (:body req))
-;                         0
-;                        (count (util/utf8-encode (:body req))))]
+(defn create-req [req-template acct]
+  (-> (util/rec-merge basic-request req-template)
+    (set-endpoint acct)
+    (encode-body)
+    (add-date)
+    (auth/sign-request acct) ; No changes beyond this point!
+    (validate)))
 
 (defn validate-req [req]
   req)
+
+(defn encode-body [req-template]
+  (let [body-enc (util/utf8-encode (:body req-template))]
+    (-> req-template
+      (assoc :body body-enc)
+      (assoc-in [:headers :content-length] (count body-enc)))))
+
+(defn add-date [req-template]
+  (assoc-in req-template [:headers :date] (auth/iso8601-datetime (Date.))))
+
+(defn set-endpoint [req-template acct]
+  (assoc req-template :server-name ((:region acct) glacier-endpoints)))
 

@@ -8,7 +8,7 @@
            [javax.crypto.spec SecretKeySpec]))
 
 (declare valmap rec-merge select uri strftime sha256 sha256mac hex-enc
-         utf8-decode print-req fmt-req http-caps)
+         utf8-decode utf8-encode print-req fmt-req http-caps)
 
 ;;; General hash-map operations
 
@@ -20,7 +20,7 @@
           (keys hmap)))
 
 (defn rec-merge [left right]
-  "Merge two hash-maps recursively (including any nested maps)."
+  "Merge two maps recursively, the second taking precedence."
   (reduce (fn [acc r]
             (let [k (r 0)
                   rv (r 1)
@@ -59,12 +59,12 @@
   (if (nil? s)
     (sha256 "")
     (let [algo (MessageDigest/getInstance "SHA-256")]
-      (hex-enc (.digest algo (utf8-decode s))))))
+      (hex-enc (.digest algo (utf8-encode s))))))
 
 (defn sha256mac [k msg]
   "Calculate the SHA-256 MAC for a key/message pair."
-  (let [k (if (instance? String k) (utf8-decode k) k)
-        msg (if (instance? String msg) (utf8-decode msg) msg)
+  (let [k (if (instance? String k) (utf8-encode k) k)
+        msg (if (instance? String msg) (utf8-encode msg) msg)
         algo "HmacSHA256"
         mac (doto (Mac/getInstance algo)
               (.init (SecretKeySpec. k algo)))]
@@ -76,12 +76,12 @@
   "Encode a byte-string in lowercase hexadecimal, byte-for-byte."
   (apply str (map #(format "%02x" %) bts)))
 
-(defn utf8-encode [bts]
-  "Encode a byte-string as UTF-8."
+(defn utf8-decode [bts]
+  "Decode a byte-string as UTF-8."
   (String. bts "utf-8"))
 
-(defn utf8-decode [^String s]
-  "Decode a String to a UTF-8 byte-string."
+(defn utf8-encode [^String s]
+  "Encode a String to a UTF-8 byte-string."
   (.getBytes s "utf-8"))
 
 ;;; Functions for interactive use
