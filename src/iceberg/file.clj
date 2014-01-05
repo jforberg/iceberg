@@ -3,21 +3,44 @@
   (:import [java.security MessageDigest DigestInputStream]
            [java.io FileInputStream File FilenameFilter]))
 
-(defrecord file [^long size ^long mtime ^String hashval])
+(defrecord FileData [^long size ^long mtime ^String hashval])
 
-(declare traverse traverse_ calc-hash create-filter create-file basename
-         path-join paths-join as-file exists?)
+(declare build-manifest traverse-reduce collect-dirs collect-dirs_ calc-hash
+         create-filter create-file basename path-join paths-join as-file mkdir
+         exists? file?  dir?)
 
-(defn traverse [dir f]
-  (traverse_ (as-file dir) (create-filter f)))
+(def id-filter (fn [_ _] true))
+(def dot-filter (fn [_ dir] (and (seq dir) (not= \. (first dir)))))
 
-(defn traverse_ [dir f]
-  (let [entries (.listFiles dir f)]
-    (if (nil? entries)
-      (create-file dir)
-      (reduce conj {} (map (fn [e] 
-                             { (basename e) (traverse_ e f)})
-                           entries)))))
+(defn build-manifest [dir pred]
+  (traverse-reduce (fn [acc ^File file] 
+                     (assoc acc file (create-file file)))
+                   {}
+                   dir
+                   pred))
+
+(defn write-manifest [man]
+  (pr-str (map (fn [[^File file ^FileData data]]
+                 (list (.getPath file) (:size data) (:mtime data) (:hashval data)))
+               man)))
+
+(defn read-manifest [s]
+  (let [lst (read-string s)]
+    (into {} (map (fn [form] 
+                    [(as-file (first form)) (apply ->FileData (rest form))])
+                  lst))))
+
+(defn traverse-reduce [f acc dir pred]
+  (reduce f acc (collect-dirs dir pred)))
+
+(defn collect-dirs [dir pred]
+  (collect-dirs_ (as-file dir) (create-filter pred)))
+
+(defn collect-dirs_ [^File dir ^FilenameFilter filt]
+  (let [entries (.listFiles dir filt)
+        files (filter file? entries)
+        dirs (filter dir? entries)]
+    (concat files (flatten (map #(collect-dirs_ % filt) dirs)))))
 
 (defn calc-hash [file]
   (let [stream (DigestInputStream. (FileInputStream. file)
@@ -29,13 +52,13 @@
   (proxy [FilenameFilter] []
     (accept [dir file] (f dir file))))
 
-(defn create-file [f]
-  (file. (.length f)
-         (.lastModified f)
-         nil))
+(defn create-file [^File file]
+  (->FileData (.length file)
+              (.lastModified file)
+              nil))
 
-(defn basename [f]
-  (.getName f))
+(defn basename [^File file]
+  (.getName file))
 
 (defn path-join [root base]
   (File. (as-file root) base))
@@ -53,5 +76,11 @@
 (defn mkdir [file]
   (.mkdirs (as-file file)))
 
-(defn exists? [file]
-  (.exists (as-file file)))
+(defn exists? [^File file]
+  (.exists file))
+
+(defn file? [^File file]
+  (.isFile file))
+
+(defn dir? [^File file]
+  (.isDirectory file))

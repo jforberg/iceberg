@@ -7,11 +7,9 @@
                  [org.clojure/tools.cli "0.3.1"]
                  [org.clojure/data.json "0.2.3"]
                  [org.clojure/algo.generic "0.1.1"]
-                 [clj-http "0.7.6"]]
+                 [clj-http "0.7.6"]
+                 [org.tukaani/xz "1.4"]]
   :profiles {:dev {:plugins [[lein-midje "3.1.0"]]
                    :dependencies [[midje "1.5.1"]
                                   [org.clojure/tools.trace "0.7.6"]]}}
-  :repl-options {:init (use 'clojure.repl
-                            'clojure.tools.namespace.repl 
-                            'midje.repl)}
   :main iceberg.core)
