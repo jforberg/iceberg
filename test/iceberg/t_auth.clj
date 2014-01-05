@@ -156,11 +156,13 @@
     (auth/cred-scope example-request-4 example-acct-2)
         => "AKIDEXAMPLE/20110909/us-east-1/host/aws4_request"))
 
-(facts "about `extract-region`"
+(facts "about `get-region`"
   (fact "Handles bogus domain"
-    (auth/extract-region "bogus") => nil)
+    (auth/get-region {:server-name "bogus"}) 
+        => nil)
   (fact "Handles proper domain"
-    (auth/extract-region "glacier.us-east-1.amazonaws.com") => "us-east-1"))
+    (auth/get-region {:server-name "glacier.us-east-1.amazonaws.com"}) 
+        => "us-east-1"))
 
 (facts "about `iso8601-datetime`"
   (fact "Handles epoch"
