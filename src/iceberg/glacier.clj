@@ -1,12 +1,14 @@
 (ns iceberg.glacier
+  "The main interface to the Glacier API."
   (:require [iceberg.util :as util]
             [iceberg.auth :as auth]
             [clojure.string :as string]
             [clj-http.client :as http])
   (:import [java.util Date]))
 
-(declare glacier-version glacier-endpoints basic-request list-vaults fire-req
-         create-req validate encode-body add-date set-endpoint)
+(declare glacier-version glacier-endpoints basic-request list-vaults
+         list-vaults-req fire-req create-req validate encode-body add-date
+         add-host set-endpoint stringify-headers)
 
 (def glacier-version  "2012-06-01")
 
@@ -25,40 +27,57 @@
   {:request-method nil   ; :get, :post, :put
    :server-name    nil   ; "glacier.xxx.amazonaws.com"
    :uri            nil   ; "/", "/vaults", ...
-   :query-string   ""    ; Any query.
+   :query-params   {}    ; Query part of the URL.
    :scheme         :http ; Temporary, should be HTTPS before we're finished.
    :headers              ; Any additional headers: signature, content-length etc.
      {:x-amz-glacier-version glacier-version} ; The version of the protocol.
-   :body           ""})  ; Payload as string.
+   :body           nil    ; Payload as string, byte-array or InputStream.
+   :meta                 ; Any internal data not related to HTTP.
+     {:date nil}})       ; Date for authentication
+
 
 (defn list-vaults [acct]
-  (create-req acct
-              {:method :get
-               :uri (util/uri (:number acct) "vaults")}))
+  (fire-req (list-vaults-req acct)))
 
-(defn fire-req [req-template]
-  (http/request (create-req req-template)))
+(defn list-vaults-req [acct]
+  (create-req {:request-method :get
+               :uri (util/uri (:number acct) "vaults")}
+              acct))
+
+(def fire-req http/request)
 
 (defn create-req [req-template acct]
   (-> (util/rec-merge basic-request req-template)
     (set-endpoint acct)
     (encode-body)
     (add-date)
+    (add-host)
     (auth/sign-request acct) ; No changes beyond this point!
+    (stringify-headers)
     (validate)))
 
-(defn validate-req [req]
+(defn validate [req]
   req)
 
 (defn encode-body [req-template]
-  (let [body-enc (util/utf8-encode (:body req-template))]
-    (-> req-template
-      (assoc :body body-enc)
-      (assoc-in [:headers :content-length] (count body-enc)))))
+  (if (not (:body req-template))
+    req-template
+    (let [body-enc (util/utf8-encode (:body req-template))]
+      (-> req-template
+        (assoc :body body-enc)
+        (assoc-in [:headers :content-length] (str (count body-enc)))))))
 
 (defn add-date [req-template]
-  (assoc-in req-template [:headers :date] (auth/iso8601-datetime (Date.))))
+  (let [date (or (auth/get-date req-template) (Date.))]
+    (-> req-template
+      (assoc-in [:meta :date] date))))
+
+(defn add-host [req-template]
+  (assoc-in req-template [:headers :host] (:server-name req-template)))
 
 (defn set-endpoint [req-template acct]
   (assoc req-template :server-name ((:region acct) glacier-endpoints)))
+
+(defn stringify-headers [req-template]
+  (assoc req-template :headers (util/keymap name (:headers req-template))))
 

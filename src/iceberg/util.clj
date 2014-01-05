@@ -1,4 +1,5 @@
 (ns iceberg.util
+  "Utility functions for general use."
   (:require [clojure.string :as string])
   (:import [java.util Date TimeZone]
            [java.text SimpleDateFormat]
@@ -16,6 +17,13 @@
   "Map over the values of a hashmap."
   (reduce (fn [acc x]
             (assoc acc x (f (hmap x))))
+          {}
+          (keys hmap)))
+
+(defn keymap [f hmap]
+  "Map over the keys of a hashmap"
+  (reduce (fn [acc x]
+            (assoc acc (f x) (hmap x)))
           {}
           (keys hmap)))
 
@@ -40,9 +48,10 @@
 
 (defn uri [& parts]
   "Construct a unix-path style uri from parts."
-  (if (empty? parts)
-    "/"
-    (string/join "/" (cons "" parts))))
+  (cond 
+    (empty? parts) "/"
+    (= \/ (first (first parts))) (string/join \/ parts)
+    :else (string/join \/ (cons "" parts))))
 
 ;;; Date handling
 
@@ -54,12 +63,11 @@
 
 ;;; Hashing functions
 
-(defn sha256 [^String s]
+(defn sha256 [s]
   "Calculate the SHA-256 of a string."
-  (if (nil? s)
-    (sha256 "")
-    (let [algo (MessageDigest/getInstance "SHA-256")]
-      (hex-enc (.digest algo (utf8-encode s))))))
+    (let [algo (MessageDigest/getInstance "SHA-256")
+          s    (or s (byte-array []))]
+      (hex-enc (.digest algo (utf8-encode s)))))
 
 (defn sha256mac [k msg]
   "Calculate the SHA-256 MAC for a key/message pair."
@@ -78,11 +86,16 @@
 
 (defn utf8-decode [bts]
   "Decode a byte-string as UTF-8."
-  (String. bts "utf-8"))
+  (if (instance? String bts)
+    bts
+    (String. bts "utf-8")))
 
-(defn utf8-encode [^String s]
-  "Encode a String to a UTF-8 byte-string."
-  (.getBytes s "utf-8"))
+(let [ByteArray (class (byte-array []))]
+  (defn utf8-encode [s]
+    "Encode a String to a UTF-8 byte-string."
+    (if (instance? ByteArray s)
+      s
+      (.getBytes s "utf-8"))))
 
 ;;; Functions for interactive use
 
@@ -92,14 +105,12 @@
 
 (defn fmt-req [req]
   "Convert a HTTP request map to conventional format."
-  (let [headers (merge {:date (:date req)
-                        :host (:server-name req)}
-                       (:headers req))
+  (let [headers (:headers req)
         fmt-headers (sort (map #(str (http-caps (name (% 0))) ": " (% 1)) 
                                headers))]
     (string/join "\n"
                  [(string/join " "
-                               [(string/upper-case (name (:method req)))
+                               [(string/upper-case (name (:request-method req)))
                                 (:uri req)
                                 "HTTP/1.1"])
                   (string/join "\n" fmt-headers)
@@ -109,3 +120,4 @@
 (defn http-caps [s]
   "Capitalise a string according to HTTP style."
   (string/join "-" (map string/capitalize (string/split s #"-"))))
+

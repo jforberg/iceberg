@@ -1,11 +1,12 @@
 (ns iceberg.file
+  "Logic for working the local file system and identifying changes."
   (:import [java.security MessageDigest DigestInputStream]
            [java.io FileInputStream File FilenameFilter]))
 
 (defrecord file [^long size ^long mtime ^String hashval])
 
 (declare traverse traverse_ calc-hash create-filter create-file basename
-         path-join paths-join as-file)
+         path-join paths-join as-file exists?)
 
 (defn traverse [dir f]
   (traverse_ (as-file dir) (create-filter f)))
@@ -48,3 +49,9 @@
   (if (instance? File maybe-file)
     maybe-file
     (File. maybe-file)))
+
+(defn mkdir [file]
+  (.mkdirs (as-file file)))
+
+(defn exists? [file]
+  (.exists (as-file file)))

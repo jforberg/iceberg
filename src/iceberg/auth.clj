@@ -1,6 +1,5 @@
-;;;; Totally boring code to handle Amazon's crazy signing system.
-
 (ns iceberg.auth
+  "An implementation of Amazon's signature protocol."
   (:require [iceberg.util :as util]
             [clojure.string :as string])
   (:import [java.util Date]))
@@ -8,7 +7,8 @@
 (declare sign-request auth-header signature signing-key string-to-sign
          canonical-request canonical-path canonical-query canonical-headers
          signed-headers rewrite-headers parse-query uri-encode uri-escape
-         cred-scope extract-region iso8601-datetime iso8601-date)
+         cred-scope get-region get-service get-date iso8601-datetime
+         iso8601-date)
 
 ;;; The only interesting function in this module. Takes a request, does all 
 ;;; the stuff needed to sign it, and puts the signature in as a header.
@@ -17,7 +17,8 @@
   (assoc req
          :headers
          (merge (req :headers)
-                {:authorization (auth-header req acct)})))
+                {:authorization (auth-header req acct)
+                 :x-amz-date (iso8601-datetime (get-date req))})))
 
 ;;; The rest is just helper functions for `signed-request`.
 
@@ -46,16 +47,16 @@
         (mac
           (mac 
             (str "AWS4" (:apikey acct)) 
-            (iso8601-date (req :date)))
-          (or (req :aws-region) (extract-region (req :server-name))))
-        (or (req :aws-service) "glacier"))
+            (iso8601-date (get-date req)))
+          (get-region req))
+        (get-service req))
       "aws4_request")))
 
 (defn string-to-sign [req]
   "Calculate the AWS4 `string-to-sign` for a request."
   (string/join "\n"
                ["AWS4-HMAC-SHA256"
-                (iso8601-datetime (req :date))
+                (iso8601-datetime (get-date req))
                 (cred-scope req)
                 (util/sha256 (canonical-request req))]))
 
@@ -103,19 +104,17 @@
 
 (defn rewrite-headers [req]
   "Rewrite the headers of a request for signing."
-  (merge (req :headers)
-         {:host (req :server-name)
-          :x-amz-date (iso8601-datetime (req :date))}))
+  (let [headers (:headers req)]
+    (if (-> req :meta :omit-x-amz-date)
+      headers
+      (assoc headers :x-amz-date (iso8601-datetime (get-date req))))))
  
 (defn parse-query [query]
   "Parse a query string into name/value pairs."
-  (if (nil? query)
-    {}
-    (let [query-pairs (map #(string/split % #"=")
-                            (string/split query #"&"))]
-      (if (every? #(every? empty? %) query-pairs)
-        {}
-        (into {} query-pairs)))))
+  (if (empty? query)
+    []
+    (map #(string/split % #"=")
+          (string/split query #"&"))))
 
 (defn uri-encode [^String s]
   "Escape a string according to URL/URI format."
@@ -144,20 +143,29 @@
                   (cred-scope req)]))
   ([req]
     (string/join "/"
-                 [(iso8601-date (req :date))
-                  (or (req :aws-region)
-                      (extract-region (req :server-name)))
-                  (or (req :aws-service)
-                      "glacier")
+                 [(iso8601-date (get-date req))
+                  (get-region req)
+                  (get-service req)
                   "aws4_request"])))
 
-(defn extract-region [host]
-  "Get the AWS `region` from a hostname."
-  (let [domains (string/split host #"\.")]
-    (try
-      (nth domains (- (count domains) 3))
-      (catch IndexOutOfBoundsException ex
-        nil))))
+(defn get-region [req]
+  "Get the AWS `region`."
+  (if (-> req :meta :region)
+    (-> req :meta :region)
+    (let [domains (string/split (:server-name req) #"\.")]
+      (try
+        (nth domains (- (count domains) 3))
+        (catch IndexOutOfBoundsException ex
+          nil)))))
+
+(defn get-service [req]
+  "Get the AWS service."
+  (if (-> req :meta :service)
+    (-> req :meta :service)
+    "glacier"))
+
+(defn get-date [req]
+  (-> req :meta :date))
 
 (defn iso8601-datetime [^Date date]
   "Print a date and time in ISO 8601 basic format."

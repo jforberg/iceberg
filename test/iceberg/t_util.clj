@@ -9,6 +9,12 @@
   (fact "Handles numeric map"
     (util/valmap inc {:a 1 :b 2 :c 3}) => {:a 2 :b 3 :c 4})))
 
+(facts "about `keymap`"
+  (fact "Handles empty map"
+    (util/keymap nil {}) => {}
+  (fact "Handles keyword map"
+    (util/keymap name {:a 1 :b 2 :c 3}) => {"a" 1 "b" 2 "c" 3})))
+
 (facts "about `rec-merge`"
   (fact "Handles empty maps"
     (util/rec-merge {} {}) => {})
@@ -29,7 +35,9 @@
   (fact "Handles one arg"
     (util/uri "foo") => "/foo")
   (fact "Handles several args"
-    (util/uri "foo" "bar" "baz" "quux") => "/foo/bar/baz/quux")) 
+    (util/uri "foo" "bar" "baz" "quux") => "/foo/bar/baz/quux")
+  (fact "Handles absolute uri"
+    (util/uri "/foo" "bar") => "/foo/bar"))
 
 (facts "about `strftime`"
   (fact "Handles epoch, iso8601 format"
