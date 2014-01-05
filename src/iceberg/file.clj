@@ -5,9 +5,9 @@
 
 (defrecord FileData [^long size ^long mtime ^String hashval])
 
-(declare build-manifest traverse-reduce collect-dirs collect-dirs_ calc-hash
-         create-filter create-file basename path-join paths-join as-file mkdir
-         exists? file?  dir?)
+(declare build-manifest write-manifest read-manifest traverse-reduce
+         collect-dirs collect-dirs_ calc-hash create-filter create-file
+         basename path-join paths-join as-file mkdir exists? file?  dir?)
 
 (def id-filter (fn [_ _] true))
 (def dot-filter (fn [_ dir] (and (seq dir) (not= \. (first dir)))))
@@ -42,7 +42,7 @@
         dirs (filter dir? entries)]
     (concat files (flatten (map #(collect-dirs_ % filt) dirs)))))
 
-(defn calc-hash [file]
+(defn calc-hash [^File file]
   (let [stream (DigestInputStream. (FileInputStream. file)
                                    (MessageDigest/getInstance "SHA-1"))]
     (while (not= -1 (.read stream)))
@@ -80,7 +80,7 @@
   (.exists file))
 
 (defn file? [^File file]
-  (.isFile file))
+  (and (not (nil? file)) (.isFile file)))
 
 (defn dir? [^File file]
-  (.isDirectory file))
+  (and (not (nil? file)) (.isDirectory file)))

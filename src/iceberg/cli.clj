@@ -81,7 +81,7 @@
       :else nil)))
 
 (defn get-config []
-  (if (not (file/exists? config-file))
+  (if (not (file/exists? (file/as-file config-file)))
     (do (file/mkdir config-dir)
         (spit config-file default-config-file)
         (exit 1 (str "Error: No config file found. I've created one for you at " config-file)))
