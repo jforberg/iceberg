@@ -1,14 +1,17 @@
 (ns iceberg.glacier
   "The main interface to the Glacier API."
-  (:require [iceberg.util :as util]
+  (:require [clojure.string :as string]
+            [clojure.data.json :as json]
+            [clj-http.client :as http]
             [iceberg.auth :as auth]
-            [clojure.string :as string]
-            [clj-http.client :as http])
+            [iceberg.log :as log]
+            [iceberg.util :as util])
   (:import [java.util Date]))
 
 (declare glacier-version glacier-endpoints basic-request list-vaults
-         list-vaults-req fire-req create-req validate encode-body add-date
-         add-host set-endpoint stringify-headers)
+         list-vaults-req fire-req create-req validate deserialize-body
+         encode-body add-date add-host set-endpoint stringify-headers
+         log-request format-request)
 
 (def glacier-version  "2012-06-01")
 
@@ -35,16 +38,18 @@
    :meta                 ; Any internal data not related to HTTP.
      {:date nil}})       ; Date for authentication
 
-
 (defn list-vaults [acct]
-  (fire-req (list-vaults-req acct)))
+  (deserialize-body
+    (fire-req (list-vaults-req acct))))
 
 (defn list-vaults-req [acct]
   (create-req {:request-method :get
                :uri (util/uri (:number acct) "vaults")}
               acct))
 
-(def fire-req http/request)
+(defn fire-req [req]
+  (log-request req)
+  (http/request req))
 
 (defn create-req [req-template acct]
   (-> (util/rec-merge basic-request req-template)
@@ -58,6 +63,12 @@
 
 (defn validate [req]
   req)
+
+(defn deserialize-body [resp]
+  (let [body (:body resp)]
+    (assoc resp :body (if (map? body) 
+                        body 
+                        (json/read-str body :key-fn keyword)))))
 
 (defn encode-body [req-template]
   (if (not (:body req-template))
@@ -81,3 +92,10 @@
 (defn stringify-headers [req-template]
   (assoc req-template :headers (util/keymap name (:headers req-template))))
 
+(defn log-request [req]
+  (log/write (format-request req)))
+
+(defn format-request [req]
+  (str (string/upper-case (name (:request-method req)))
+       \space
+       (:uri req)))

@@ -9,7 +9,7 @@
     .deleteOnExit))
 
 (defn new-test-dir []
-  (doto (File. (str "/tmp/iceberg-test." (rand-int 1e9)))
+  (doto (File. (str "/tmp/iceberg-test/dir." (rand-int 1e9)))
     .mkdirs
     .deleteOnExit))
 

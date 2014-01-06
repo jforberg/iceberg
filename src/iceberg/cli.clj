@@ -5,18 +5,19 @@
             [clojure.string :as string]
             [iceberg.glacier :as glacier]
             [iceberg.file :as file]
+            [iceberg.log :as log]
             [iceberg.util :as util])
   (:gen-class))
 
 (declare cli-options default-config default-config-file config-dir config-file
          run-cli exit error-msg usage validate-config get-config list-vaults
-         format-error decode-body)
+         log-error format-error)
 
 (def cli-options
   [["-h" "--help" "Display usage information"]])
 
 (def default-config
-  {})
+  {:log-file ".iceberg/iceberg.log"})
 
 (def default-config-file
   (->> [";;;; Config file for Iceberg."
@@ -45,12 +46,19 @@
     (let [config-errors (validate-config config)]
       (when config-errors 
         (exit 1 (str "Configuration error: " config-errors))))
-    ;; Run program.
-    (case (first arguments)
-      "list-vaults" (list-vaults (rest arguments) options config))))
+    ;; Add additional configuration info.
+    (let [config (assoc config :command-line (string/join \space args)
+                               :interactive true)]
+      ;; Initiate logging.
+      (log/init! config)
+      ;; Run program.
+      (case (first arguments)
+        "list-vaults" (list-vaults (rest arguments) options config)))))
 
 (defn exit [status msg]
-  (println msg)
+  (when msg
+    (log/write msg))
+  (log/write (format "Exit (%d)" status))
   (System/exit status))
 
 (defn error-msg [errors]
@@ -90,18 +98,18 @@
 (defn list-vaults [arguments options config]
   (try
     (let [response (glacier/list-vaults config)
-          body (decode-body response)]
+          body (glacier/deserialize-body response)]
       (map println (:VaultList body)))
-    (catch Exception e
-      (exit 1 (format-error e)))))
+    (catch clojure.lang.ExceptionInfo e
+      (log-error e)
+      (exit 1 nil))))
 
-(defn format-error [e]
+(defn log-error [^clojure.lang.ExceptionInfo e]
+  (log/write (format-error e)))
+
+(defn format-error [^clojure.lang.ExceptionInfo e]
   (let [response (:object (ex-data e))
-        body (decode-body response)]
-    (->> [(str "Error HTTP/" (:status response) " AWS/" (:code body))
+        body (:body (glacier/deserialize-body response))]
+    (->> [(str "Error HTTP/" (:status response) " Amazon/" (:code body))
           (:message body)]
          (string/join \newline))))
-
-(defn decode-body [response]
-  (json/read-str (:body response)
-                 :key-fn keyword))
