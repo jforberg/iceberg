@@ -9,7 +9,6 @@ Iceberg is a backup system targeting the Amazon Glacier cloud storage. It's writ
 * Comression where appropriate (heuristics for deciding when it is).
 * Restoration of backup, to file system or for consistency checking.
 * A stable protocol/API/file format so that backups from previous versions can be reliably restored.
-* Implementation of 
 
 ## Implemented features
 
