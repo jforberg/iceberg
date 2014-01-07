@@ -1,18 +1,32 @@
 # Iceberg
-*A client for Amazon Glacier, in Clojure*
 
-Iceberg is a Clojure library and command-line client for the Amazon Glacier backup service. 
+Iceberg is a backup system targeting the Amazon Glacier cloud storage. It's written in Clojure and runs on the JVM.
 
-## What it should be able to do
+## Planned features
 
-* Perform unidirectional backups to Glacier.
-* Encryption. 
-* Restore a backup only from what is stored at Glacier.
-* Have a stable protocol/API (so that backups can be reliably restored).
+* Unidirectional backup to the Glacier service.
+* Encryption of all uploaded material.
+* Comression where appropriate (heuristics for deciding when it is).
+* Restoration of backup, to file system or for consistency checking.
+* A stable protocol/API/file format so that backups from previous versions can be reliably restored.
+* Implementation of 
 
-## What it can currently do
+## Implemented features
 
-* Not very much.
-* Authentication using Amazon's strange scheme.
+* Authentication using Amazon's scheme is fairly complete.
+* Beginning support for Glacier's REST API.
+* Rudimentary filesystem abstraction.
 
-Copyright © 2013 Johan Förberg <johan@forberg.se>
+# What is Glacier?
+
+Glacier is Amazon's long-term backup service. Its performance characteristics are similar to those of old-school tape backups &mdash; put requests and storage are very cheap, but file listing and retrieval is expensive (time-wise). This is well suited for a backup service but also presents some interesting challenges. Specifically, the inability to do file listings/stats in a timely manner precludes the use of most common backup tools.
+
+http://aws.amazon.com/glacier/
+
+As far as I have understood, Iceberg is the first attempt to build an open-source backup system targeting Glacier.
+
+# License
+
+Copyright © 2013-2014 Johan Förberg <johan@forberg.se>
+
+Iceberg is open-source under a [BSD 2-clause license](http://opensource.org/licenses/BSD-2-Clause).
