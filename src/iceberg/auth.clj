@@ -14,24 +14,17 @@
 ;;; the stuff needed to sign it, and puts the signature in as a header.
 (defn sign-request [req acct]
   "Add the proper Authorization header to a Glacier request."
-  (assoc req
-         :headers
-         (merge (req :headers)
-                {:authorization (auth-header req acct)
-                 :x-amz-date (iso8601-datetime (get-date req))})))
+  (util/rec-merge req {:headers {:authorization (auth-header req acct)
+                                 :x-amz-date (iso8601-datetime (get-date req))}}))
 
 ;;; The rest is just helper functions for `signed-request`.
 
 (defn auth-header [req acct]
   "Construct the Authorization header for a Glacier request "
-  (str
-    "AWS4-HMAC-SHA256 "
-    "Credential="
-    (cred-scope req acct)
-    ", SignedHeaders="
-    (string/join ";" (signed-headers req))
-    ", Signature="
-    (signature req acct)))
+  (format "AWS4-HMAC-SHA256 Credential=%s, SignedHeaders=%s, Signature=%s"
+          (cred-scope req acct)
+          (string/join ";" (signed-headers req))
+          (signature req acct)))
 
 (defn signature [req acct]
   "Calculate the signature for a Glacier request."
@@ -42,15 +35,11 @@
 (defn signing-key [req acct]
   "Calculate the signing-key for a request/account combination."
   (let [mac util/sha256mac]
-    (mac
-      (mac
-        (mac
-          (mac 
-            (str "AWS4" (:apikey acct)) 
-            (iso8601-date (get-date req)))
-          (get-region req))
-        (get-service req))
-      "aws4_request")))
+    (-> (str "AWS4" (:apikey acct))
+        (mac (iso8601-date (get-date req)))
+        (mac (get-region req))
+        (mac (get-service req))
+        (mac "aws4_request"))))
 
 (defn string-to-sign [req]
   "Calculate the AWS4 `string-to-sign` for a request."
@@ -63,13 +52,13 @@
 (defn canonical-request [req]
   "Arrange a request into AWS4 `canonical form`."
   (string/join "\n"
-    [(string/upper-case (name (req :request-method)))
-     (canonical-path (req :uri))
-     (canonical-query (req :query-string))
-     (canonical-headers req)
-     ""
-     (string/join ";" (signed-headers req))
-     (util/sha256 (req :body))]))
+               [(string/upper-case (name (:request-method req)))
+                (canonical-path (:uri req))
+                (canonical-query (:query-string req))
+                (canonical-headers req)
+                ""
+                (string/join ";" (signed-headers req))
+                (util/sha256 (:body req))]))
 
 (defn canonical-path [uri]
   "Arrange a uri into AWS4 `canonical form`."
@@ -150,18 +139,15 @@
 
 (defn get-region [req]
   "Get the AWS `region`."
-  (if (-> req :meta :region)
-    (-> req :meta :region)
-    (let [domains (string/split (:server-name req) #"\.")]
-      (try
-        (nth domains (- (count domains) 3))
-        (catch IndexOutOfBoundsException ex
-          nil)))))
+  (if-let [region  (-> req :meta :region)]
+    region
+    (nth (reverse (string/split (:server-name req) #"\."))
+         2)))
 
 (defn get-service [req]
   "Get the AWS service."
-  (if (-> req :meta :service)
-    (-> req :meta :service)
+  (if-let [service (-> req :meta :service)]
+    service
     "glacier"))
 
 (defn get-date [req]

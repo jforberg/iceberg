@@ -1,4 +1,4 @@
-(ns iceberg.compress
+(ns iceberg.crypto
   (:require [iceberg.file :as file])
   (:import [java.io FileOutputStream FileInputStream]
            [org.tukaani.xz XZOutputStream XZInputStream LZMA2Options]))
