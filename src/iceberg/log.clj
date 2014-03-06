@@ -5,8 +5,8 @@
   (:import [java.util Date]
            [java.io OutputStream]))
 
-(declare *logfile* *console* *verbosity* init! write first-template
-         rest-template format-entry)
+(declare ^:dynamic *logfile* ^:dynamic *console* ^:dynamic *verbosity* init!
+         write first-template rest-template format-entry)
 
 (def ^:dynamic *logfile* nil)
 (def ^:dynamic *console* nil)
