@@ -31,7 +31,7 @@
         (print (format-entry s))
         (flush)))
     ;; Print to stdout if appropriate verbosity
-    (when true ;(<= level *verbosity*)
+    (when (<= level *verbosity*)
       (print (newline-terminated s))
       (flush))))
 
@@ -52,3 +52,8 @@
         (= \newline (last s)) s
         :else (str s \newline)))
 
+(defn pad-lines [spaces lines]
+  (let [padding (apply str (take spaces (repeat \space)))]
+    (string/join \newline (map #(str padding %) 
+                                (string/split-lines lines)))))
+                     

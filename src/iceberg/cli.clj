@@ -116,6 +116,7 @@
 (defn format-error [^clojure.lang.ExceptionInfo e]
   (let [response (:object (ex-data e))
         body (:body (glacier/deserialize-body response))]
-    (->> [(str "Error HTTP/" (:status response) " Amazon/" (:code body))
-          (:message body)]
+    (->> [""
+          (str "Error HTTP/" (:status response) " Amazon/" (:code body))
+          (log/pad-lines 6 (:message body))]
          (string/join \newline))))
