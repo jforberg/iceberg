@@ -3,6 +3,7 @@
   (:require [clojure.tools.cli :as clj-cli]
             [clojure.data.json :as json]
             [clojure.string :as string]
+            [clojure.core.strint :refer [<<]]
             [iceberg.glacier :as glacier]
             [iceberg.file :as file]
             [iceberg.log :as log]
@@ -33,15 +34,16 @@
 
 (def config-file (util/uri config-dir "config.clj"))
 
-(defn run-cli [args]
+(defn run [args]
   (let [{:keys [options arguments errors summary]}
           (clj-cli/parse-opts args cli-options)
-        config (util/rec-merge default-config (get-config))]
+        config (util/rec-merge default-config (get-config))
+        usage (usage summary)]
     ;; Check for errors.
     (cond
-      (:help options) (exit 0 (usage summary))
-      (empty? arguments) (exit 1 (usage summary))
-      errors (exit 1 (error-msg errors)))
+      (:help options) (exit 0 usage)
+      errors (exit 1 (error-msg errors))
+      (empty? arguments) (exit 1 usage))
     ;; Check config consistency.
     (let [config-errors (validate-config config)]
       (when config-errors 
@@ -52,29 +54,33 @@
       ;; Initiate logging.
       (log/init! config)
       ;; Run program.
-      (case (first arguments)
-        "list-vaults" (list-vaults (rest arguments) options config)))))
+      (let [command (first arguments)]
+        (case command
+          "list-vaults" (list-vaults (rest arguments) options config)
+          (exit 1 (<< "No such command `~{command}`")))))))
 
-(defn exit [status msg]
-  (when msg
-    (log/write msg))
-  (log/write (format "Exit (%d)" status))
-  (System/exit status))
+(defn exit 
+  ([status]
+    (exit status ""))
+  ([status msg]
+    (when msg
+      (log/write msg))
+    (System/exit status)))
 
 (defn error-msg [errors]
   (str "Error: invalid usage. See `iceberg -h` for help."
        (string/join \newline errors)))
 
 (defn usage [options-summary]
-  (->> ["Iceberg: Amazon Glacier client for UNIX."
+  (->> ["Iceberg: Amazon Glacier client."
         ""
         "Usage: iceberg command [options]"
         ""
-        "Options:"
-        options-summary
-        ""
         "Commands:"
-        "  list-vaults    List the vaults in your account"]
+        "  list-vaults    List the vaults in your account"
+        ""
+        "Options:"
+        options-summary]
         (string/join \newline)))
 
 (defn validate-config [config]

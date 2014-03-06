@@ -5,11 +5,10 @@
   (:import [java.util Date]
            [java.io OutputStream]))
 
-(declare ^:dynamic *logfile* ^:dynamic *console* ^:dynamic *verbosity* init!
-         write first-template rest-template format-entry)
+(declare ^:dynamic *logfile* ^:dynamic *verbosity* init!  write first-template
+         rest-template format-entry newline-terminated)
 
 (def ^:dynamic *logfile* nil)
-(def ^:dynamic *console* nil)
 (def ^:dynamic *verbosity* 0)
 
 (defn init! [config]
@@ -26,14 +25,15 @@
   ([^String s]
    (write s 0))
   ([^String s level]
-    (binding [*out* *logfile*]
-      (print (format-entry s))
-      (flush))
-    (when (and (<= level *verbosity*)
-               *console*)
-      (binding [*out* *console*]
-        (print (format-entry s)
-        (flush))))))
+    ;; Print to logfile
+    (when *logfile*
+      (binding [*out* *logfile*]
+        (print (format-entry s))
+        (flush)))
+    ;; Print to stdout if appropriate verbosity
+    (when true ;(<= level *verbosity*)
+      (print (newline-terminated s))
+      (flush))))
 
 (def first-template "[%s] %s\n")
 (def rest-template "                    %s\n")
@@ -46,3 +46,9 @@
            (apply str (map #(format rest-template %)
                            remaining))
            ""))))
+
+(defn newline-terminated [^String s]
+  (cond (empty? s) ""
+        (= \newline (last s)) s
+        :else (str s \newline)))
+

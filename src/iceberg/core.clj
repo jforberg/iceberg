@@ -6,7 +6,7 @@
 (def ^:dynamic *config* nil)
 
 (defn -main [& args]
-  (cli/run-cli args))
+  (cli/run args))
 
 (defmacro with-config [config & more]
   `(binding [*config* ~config]
