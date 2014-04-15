@@ -4,6 +4,8 @@
             [iceberg.util :as util])
   (:import [java.io File]))
 
+;;; Helper defs
+
 (defn new-test-file [^File dir]
   (doto (File/createTempFile "iceberg-test." nil dir)
     .deleteOnExit))
@@ -22,6 +24,8 @@
 (def example-mtime-2 (.lastModified example-file-2))
 
 (spit example-file-2 "test string")
+
+;;; Test facts
 
 (facts "about `build-manifest`"
   (fact "handles empty dir"
@@ -67,6 +71,13 @@
   (fact "handles test string"
     (util/hex-enc
       (file/calc-hash example-file-2)) => "661295c9cbf9d6b2f6428414504a8deed3020641"))
+
+(facts "about `create-filter`"
+  (fact "handles example"
+    (let [func #(= "hej" %2)
+          filt (file/create-filter func)]
+      (.accept filt (File. "/onedir") "other") => false
+      (.accept filt (File. "/twodir") "hej")) => true))
 
 (facts "about `path-join`"
   (fact "handles root"
