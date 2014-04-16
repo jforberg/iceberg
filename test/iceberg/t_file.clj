@@ -15,7 +15,7 @@
     .mkdirs
     .deleteOnExit))
 
-(defn fdata= [fdata1 fdata2]
+#_ (defn fdata= [fdata1 fdata2]
   (and
     (= (:size fdata1) (:size fdata2))
     (= (:mtime fdata1) (:mtime fdata2))
@@ -29,12 +29,11 @@
 (def example-file-2 (new-test-file example-dir-1))
 (def example-mtime-2 (.lastModified example-file-2))
 
-(def example-hash1 (byte-array (map byte "abc")))
-(def example-hash2 (byte-array (map byte "def")))
-(def example-hash3 (byte-array (map byte "ghi")))
-(def example-hash4 (byte-array (map byte "jkl")))
-
+(spit example-file-1 "")
 (spit example-file-2 "test string")
+
+(def example-hash-1 "da39a3ee5e6b4b0d3255bfef95601890afd80709")
+(def example-hash-2 "661295c9cbf9d6b2f6428414504a8deed3020641")
 
 ;;; Test facts
 
@@ -43,16 +42,19 @@
     (file/build-manifest example-dir-2 (fn [_ _] true)) => {})
   (fact "handles non-empty dir"
     (file/build-manifest example-dir-1 (fn [_ _] true))
-      => (partial fdata= 
-           {example-file-1 (file/->FileData 0 example-mtime-1 
-                                            (file/calc-hash example-file-1))
-            example-file-2 (file/->FileData 11 example-mtime-2 
-                                            (file/calc-hash example-file-2))})))
+      => {example-file-1 (file/->FileData 0 example-mtime-1 example-hash-1)
+          example-file-2 (file/->FileData 11 example-mtime-2 example-hash-2)}
+  (fact "generates equal manifest for equal files"
+    ;; It's conceivable this may fail due to someone modifying the test files...
+    (file/build-manifest example-dir-1 file/id-filter) 
+        => (file/build-manifest example-dir-1 file/id-filter)
+    (file/build-manifest example-dir-2 file/id-filter) 
+        => (file/build-manifest example-dir-2 file/id-filter))))
 
 (facts "about `file-builder`"
   (fact "handles case of empty oldman"
     ((file/file-builder {}) {} example-file-1)
-        => (partial fdata= {example-file-1 (file/file-data example-file-1)})))
+        => {example-file-1 (file/file-data example-file-1)}))
 
 (facts "about `write-manifest`"
   (fact "handles empty manifest"
@@ -70,12 +72,12 @@
 
 (facts "about `manifest-changes`"
   (let [test-file (File. "interesting") ; File used for testing
-        test-data (file/->FileData 1 2 example-hash1) ; FileData for testing
-        test-man {(File. "irrelevant") (file/->FileData 0 0 example-hash2)
+        test-data (file/->FileData 1 2 "abc") ; FileData for testing
+        test-man {(File. "irrelevant") (file/->FileData 0 0 "def")
                   test-file test-data}] ; Also file just along for the ride
     (fact "handles new file"
       (let [new-file (File. "new")
-            new-data (file/->FileData 1 2 example-hash3)]
+            new-data (file/->FileData 1 2 "ghi")]
         (file/manifest-changes test-man (assoc test-man new-file new-data))
             => {new-file (file/->FileChange :new-file new-data)}))
     (fact "handles deleted file"
@@ -86,13 +88,13 @@
         (file/manifest-changes test-man (assoc test-man test-file new-data))
             => {test-file (file/->FileChange :meta-changed new-data)}))
     (fact "handles modified blob"
-      (let [new-data (assoc test-data :hashval example-hash4)]
+      (let [new-data (assoc test-data :hashval "jkl")]
         (file/manifest-changes test-man (assoc test-man test-file new-data))
             => {test-file (file/->FileChange :blob-changed new-data)}))))
 
 (facts "about `file-change`"
   (let [file (File. "testfile")
-        test-data (file/->FileData 1 2 example-hash1)]
+        test-data (file/->FileData 1 2 "abc")]
     (fact "handles empty case"
       (file/file-change file {} {}) => nil)
     (fact "handles no change"
@@ -109,7 +111,7 @@
       (file/file-change file {file test-data} {file mod-data})
           => [file (file/->FileChange :meta-changed mod-data)]))
     (fact "handles blob modification for one file"
-      (let [mod-data (assoc test-data :hashval example-hash2)]
+      (let [mod-data (assoc test-data :hashval "def")]
       (file/file-change file {file test-data} {file mod-data})
           => [file (file/->FileChange :blob-changed mod-data)]))))
 
@@ -130,11 +132,9 @@
 
 (facts "about `calc-hash`"
   (fact "handles empty file"
-    (util/hex-enc
-      (file/calc-hash example-file-1)) => "da39a3ee5e6b4b0d3255bfef95601890afd80709")
-  (fact "handles test string"
-    (util/hex-enc
-      (file/calc-hash example-file-2)) => "661295c9cbf9d6b2f6428414504a8deed3020641"))
+    (file/calc-hash example-file-1) => example-hash-1)
+  (fact "handles example file"
+    (file/calc-hash example-file-2) => example-hash-2))
 
 (facts "about `create-filter`"
   (fact "handles example"
@@ -180,7 +180,7 @@
     (file/dir? example-file-1) => false))
 
 (facts "about `meta-changed?`"
-  (let [test-data (file/->FileData 1 2 nil)]
+  (let [test-data (file/->FileData 1 2 "")]
     (fact "handles unchanged meta"
       (file/meta-changed? test-data test-data) => false)
     (fact "handles changed meta"
