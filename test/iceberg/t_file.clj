@@ -15,6 +15,12 @@
     .mkdirs
     .deleteOnExit))
 
+(defn fdata= [fdata1 fdata2]
+  (and
+    (= (:size fdata1) (:size fdata2))
+    (= (:mtime fdata1) (:mtime fdata2))
+    (util/array= (:hashval fdata1) (:hashval fdata2))))
+
 (def example-dir-1 (new-test-dir))
 (def example-dir-2 (new-test-dir)) ; empty
 
@@ -22,6 +28,11 @@
 (def example-mtime-1 (.lastModified example-file-1))
 (def example-file-2 (new-test-file example-dir-1))
 (def example-mtime-2 (.lastModified example-file-2))
+
+(def example-hash1 (byte-array (map byte "abc")))
+(def example-hash2 (byte-array (map byte "def")))
+(def example-hash3 (byte-array (map byte "ghi")))
+(def example-hash4 (byte-array (map byte "jkl")))
 
 (spit example-file-2 "test string")
 
@@ -32,8 +43,16 @@
     (file/build-manifest example-dir-2 (fn [_ _] true)) => {})
   (fact "handles non-empty dir"
     (file/build-manifest example-dir-1 (fn [_ _] true))
-        => {example-file-1 (file/->FileData 0 example-mtime-1 nil)
-            example-file-2 (file/->FileData 11 example-mtime-2 nil)}))
+      => (partial fdata= 
+           {example-file-1 (file/->FileData 0 example-mtime-1 
+                                            (file/calc-hash example-file-1))
+            example-file-2 (file/->FileData 11 example-mtime-2 
+                                            (file/calc-hash example-file-2))})))
+
+(facts "about `file-builder`"
+  (fact "handles case of empty oldman"
+    ((file/file-builder {}) {} example-file-1)
+        => (partial fdata= {example-file-1 (file/file-data example-file-1)})))
 
 (facts "about `write-manifest`"
   (fact "handles empty manifest"
@@ -48,6 +67,51 @@
   (fact "handles non-empty manifest"
     (file/read-manifest "((\"file\" 1 2 \"hash\"))")
         => {(File. "file") (file/->FileData 1 2 "hash")}))
+
+(facts "about `manifest-changes`"
+  (let [test-file (File. "interesting") ; File used for testing
+        test-data (file/->FileData 1 2 example-hash1) ; FileData for testing
+        test-man {(File. "irrelevant") (file/->FileData 0 0 example-hash2)
+                  test-file test-data}] ; Also file just along for the ride
+    (fact "handles new file"
+      (let [new-file (File. "new")
+            new-data (file/->FileData 1 2 example-hash3)]
+        (file/manifest-changes test-man (assoc test-man new-file new-data))
+            => {new-file (file/->FileChange :new-file new-data)}))
+    (fact "handles deleted file"
+      (file/manifest-changes test-man (dissoc test-man test-file))
+          => {test-file (file/->FileChange :deleted-file nil)})
+    (fact "handles modified metadata"
+      (let [new-data (file/->FileData 3 4 (:hashval test-data))]
+        (file/manifest-changes test-man (assoc test-man test-file new-data))
+            => {test-file (file/->FileChange :meta-changed new-data)}))
+    (fact "handles modified blob"
+      (let [new-data (assoc test-data :hashval example-hash4)]
+        (file/manifest-changes test-man (assoc test-man test-file new-data))
+            => {test-file (file/->FileChange :blob-changed new-data)}))))
+
+(facts "about `file-change`"
+  (let [file (File. "testfile")
+        test-data (file/->FileData 1 2 example-hash1)]
+    (fact "handles empty case"
+      (file/file-change file {} {}) => nil)
+    (fact "handles no change"
+      (let [man {file test-data}]
+        (file/file-change file man man) => nil))
+    (fact "handles addition of one file"
+      (file/file-change file {} {file test-data})
+          => [file (file/->FileChange :new-file test-data)])
+    (fact "handles removal of one file"
+      (file/file-change file {file test-data} {})
+          => [file (file/->FileChange :deleted-file nil)])
+    (fact "handles metadata modification for one file"
+      (let [mod-data (assoc test-data :mtime 123123)]
+      (file/file-change file {file test-data} {file mod-data})
+          => [file (file/->FileChange :meta-changed mod-data)]))
+    (fact "handles blob modification for one file"
+      (let [mod-data (assoc test-data :hashval example-hash2)]
+      (file/file-change file {file test-data} {file mod-data})
+          => [file (file/->FileChange :blob-changed mod-data)]))))
 
 (facts "about `traverse-reduce`"
   (fact "handles empty dir"
@@ -114,3 +178,11 @@
     (file/dir? example-dir-1) => true)
   (fact "handles file"
     (file/dir? example-file-1) => false))
+
+(facts "about `meta-changed?`"
+  (let [test-data (file/->FileData 1 2 nil)]
+    (fact "handles unchanged meta"
+      (file/meta-changed? test-data test-data) => false)
+    (fact "handles changed meta"
+      (file/meta-changed? test-data (assoc test-data :mtime 123)) => true)))
+

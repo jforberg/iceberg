@@ -71,3 +71,15 @@
     (util/hex-enc "") => "")
   (fact "Handles `deadbeef`"
     (util/hex-enc [0xDE 0xAD 0xBE 0xEF]) => "deadbeef"))
+
+(facts "about `array=`"
+  (let [a1 (byte-array (map byte [1 2 3 4 5]))
+        a2 (byte-array (map byte [6 7 8 9 10]))]
+    (fact "considers nil == nil"
+      (util/array= nil nil) => true)
+    (fact "considers nil != [?]"
+      (util/array= a1 nil) => false)
+    (fact "handles byte[] != byte[]"
+      (util/array= a1 a2) => false)
+    (fact "handles byte[] == byte[]"
+      (util/array= a1 a1) => true)))

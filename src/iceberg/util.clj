@@ -1,7 +1,7 @@
 (ns iceberg.util
   "Utility functions for general use."
   (:require [clojure.string :as string])
-  (:import [java.util Date TimeZone]
+  (:import [java.util Date TimeZone Arrays]
            [java.text SimpleDateFormat]
            [java.io InputStream]
            [java.security MessageDigest]
@@ -13,22 +13,25 @@
 
 ;;; General hash-map operations
 
-(defn valmap [f hmap]
+(defn valmap
   "Map over the values of a hashmap."
+  [f hmap]
   (reduce (fn [acc x]
             (assoc acc x (f (hmap x))))
           {}
           (keys hmap)))
 
-(defn keymap [f hmap]
+(defn keymap
   "Map over the keys of a hashmap"
+  [f hmap]
   (reduce (fn [acc x]
             (assoc acc (f x) (hmap x)))
           {}
           (keys hmap)))
 
-(defn rec-merge [left right]
+(defn rec-merge 
   "Merge two maps recursively, the second taking precedence."
+  [left right]
   (reduce (fn [acc r]
             (let [k (r 0)
                   rv (r 1)
@@ -39,15 +42,17 @@
           left
           right))
 
-(defn select [hmap ks]
+(defn select 
   "Select certain keys from a hashmap, giving a new hashmap"
+  [hmap ks]
   (reduce (fn [acc k]
             (assoc acc k (get hmap k)))
           {}
           ks))
 
-(defn uri [& parts]
+(defn uri 
   "Construct a unix-path style uri from parts."
+  [& parts]
   (cond 
     (empty? parts) "/"
     (= \/ (first (first parts))) (string/join \/ parts)
@@ -55,22 +60,25 @@
 
 ;;; Date handling
 
-(defn strftime [^String fmt ^Date date]
+(defn strftime 
   "Like the C function, but with Java's SimpleDateFormat."
+  [^String fmt ^Date date]
   (let [formatter (doto (SimpleDateFormat. fmt)
                     (.setTimeZone (TimeZone/getTimeZone "GMT")))]
     (.format formatter date)))
 
 ;;; Hashing functions
 
-(defn sha256 [s]
+(defn sha256
   "Calculate the SHA-256 of a string."
-    (let [algo (MessageDigest/getInstance "SHA-256")
-          s    (or s (byte-array []))]
-      (hex-enc (.digest algo (utf8-encode s)))))
+  [s]
+  (let [algo (MessageDigest/getInstance "SHA-256")
+        s    (or s (byte-array []))]
+    (hex-enc (.digest algo (utf8-encode s)))))
 
-(defn sha256mac [k msg]
+(defn sha256mac 
   "Calculate the SHA-256 MAC for a key/message pair."
+  [k msg]
   (let [k (if (instance? String k) (utf8-encode k) k)
         msg (if (instance? String msg) (utf8-encode msg) msg)
         algo "HmacSHA256"
@@ -80,31 +88,35 @@
 
 ;;; Encoding/decoding
 
-(defn hex-enc [bts]
+(defn hex-enc
   "Encode a byte-string in lowercase hexadecimal, byte-for-byte."
+  [bts]
   (apply str (map #(format "%02x" %) bts)))
 
-(defn utf8-decode [bts]
+(defn utf8-decode 
   "Decode a byte-string as UTF-8."
+  [bts]
   (if (instance? String bts)
     bts
     (String. bts "utf-8")))
 
-(let [ByteArray (class (byte-array []))]
-  (defn utf8-encode [s]
-    "Encode a String to a UTF-8 byte-string."
-    (if (instance? ByteArray s)
-      s
-      (.getBytes s "utf-8"))))
+(defn utf8-encode 
+  "Encode a String to a UTF-8 byte-string."
+  [s]
+  (if (instance? (class (byte-array [])) s)
+    s
+    (.getBytes s "utf-8")))
 
 ;;; Functions for interactive use
 
-(defn print-req [req]
+(defn print-req
   "Print a HTTP request map in conventional format."
+  [req]
   (print (fmt-req req)))
 
-(defn fmt-req [req]
+(defn fmt-req
   "Convert a HTTP request map to conventional format."
+  [req]
   (let [headers (:headers req)
         fmt-headers (sort (map #(str (http-caps (name (% 0))) ": " (% 1)) 
                                headers))]
@@ -117,7 +129,15 @@
                   ""
                   (:body req)])))
 
-(defn http-caps [s]
+(defn http-caps
   "Capitalise a string according to HTTP style."
+  [s]
   (string/join "-" (map string/capitalize (string/split s #"-"))))
+
+(defn array=
+  "Equality for java arrays"
+  [a1 a2]
+  (if (and (nil? a1) (nil? a2))
+    true
+    (Arrays/equals a1 a2)))
 
