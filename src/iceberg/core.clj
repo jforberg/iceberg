@@ -1,5 +1,6 @@
 (ns iceberg.core
   "A cross-platform backup tool targeting Amazon's Glacier service"
+  (:gen-class)
   (:require [iceberg.cli :as cli]
             [iceberg.glacier :as glacier]))
 
