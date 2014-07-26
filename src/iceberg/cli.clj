@@ -6,46 +6,34 @@
             [clojure.core.strint :refer [<<]]
             [iceberg.glacier :as glacier]
             [iceberg.file :as file]
+            [iceberg.config :as config]
             [iceberg.log :as log]
             [iceberg.util :as util])
   (:gen-class))
 
-(declare cli-options default-config default-config-file config-dir config-file
-         run-cli exit error-msg usage validate-config get-config list-vaults
-         log-error format-error)
+(declare cli-options run-cli exit error-msg usage list-vaults
+         log-error format-error gen-config)
 
 (def cli-options
   [["-h" "--help" "Display usage information"]])
 
-(def default-config
-  {:log-file ".iceberg/iceberg.log"})
-
-(def default-config-file
-  (->> [";;;; Config file for Iceberg."
-        "{"
-        " :region :my-region  ; One of :virgina, :oregon, :california, :ireland, :tokyo."
-        " :number \"00000000\" ; Your AWS account number."
-        " :keyid  \"ABCD1234\"  ; Your AWS public key ID."
-        " :apikey \"ABcd1234\"  ; Your AWS secret key."
-        "}"]
-       (string/join \newline)))
-
-(def config-dir (util/uri (System/getProperty "user.home") ".iceberg"))
-
-(def config-file (util/uri config-dir "config.clj"))
-
 (defn run [args]
   (let [{:keys [options arguments errors summary]}
           (clj-cli/parse-opts args cli-options)
-        config (util/rec-merge default-config (get-config))
+        config (config/get-config)
+        command (first arguments)
         usage (usage summary)]
     ;; Check for errors.
     (cond
       (:help options) (exit 0 usage)
       errors (exit 1 (error-msg errors))
       (empty? arguments) (exit 1 usage))
+    ;; Gen-config, early exit.
+    (when (= "gen-config" command)
+      (gen-config (rest arguments) options config)
+      (exit 0))
     ;; Check config consistency.
-    (let [config-errors (validate-config config)]
+    (let [config-errors (config/validate-config config)]
       (when config-errors 
         (exit 1 (str "Configuration error: " config-errors))))
     ;; Add additional configuration info.
@@ -54,10 +42,9 @@
       ;; Initiate logging.
       (log/init! config)
       ;; Run program.
-      (let [command (first arguments)]
-        (case command
-          "list-vaults" (list-vaults (rest arguments) options config)
-          (exit 1 (<< "No such command `~{command}`")))))))
+      (case command
+        "list-vaults" (list-vaults (rest arguments) options config)
+        (exit 1 (<< "No such command `~{command}`"))))))
 
 (defn exit 
   ([status]
@@ -83,30 +70,33 @@
         options-summary]
         (string/join \newline)))
 
-(defn validate-config [config]
-  (let [{:keys [region number keyid apikey]} config]
-    (cond
-      (or (not (contains? glacier/glacier-endpoints region))
-          (not (instance? clojure.lang.Keyword region))) "Region missing or invalid."
-      (not (instance? String number)) "Account number missing or invalid."
-      (re-matches #"-" number) "Account number must not contain dashes."
-      (not (instance? String keyid)) "Key ID missing or invalid."
-      (not (instance? String apikey)) "Key missing or invalid."
-      :else nil)))
-
-(defn get-config []
-  (if (not (file/exists? (file/as-file config-file)))
-    (do (file/mkdir config-dir)
-        (spit config-file default-config-file)
-        (exit 1 (str "Error: No config file found. I've created one for you at " config-file)))
-    (read-string (slurp config-file))))
-
 (defn list-vaults [arguments options config]
   (try
     (let [response (glacier/list-vaults config)
-          body (glacier/deserialize-body response)]
-      (map println (:VaultList body)))
+          body (glacier/deserialize-body response)
+          vaults (-> body :body :VaultList)]
+      (log/write (format "Listing %d vault(s)" (count vaults)))
+      (doseq [[i v] (map vector (range) vaults)]
+        (log/write (format "  %d. %s (%d archives, %d bytes as of %s)"
+                           (inc i)
+                           (:VaultName v)
+                           (:NumberOfArchives v)
+                           (:SizeInBytes v)
+                           (or (:LastInventoryDate v) "creation")))))
     (catch clojure.lang.ExceptionInfo e
+      (log-error e)
+      (exit 1 nil))))
+
+(defn gen-config [arguments options config]
+  (try
+    (let [f config/config-template-location]
+      (if (file/exists? f)
+        (println (format "Not overwriting existing file at %s." f))
+        (do 
+          (spit config/config-template-location
+                config/config-stub)
+          (println (format "Created template config in %s." f)))))
+    (catch java.io.IOException e
       (log-error e)
       (exit 1 nil))))
 
@@ -120,3 +110,4 @@
           (str "Error HTTP/" (:status response) " Amazon/" (:code body))
           (log/pad-lines 6 (:message body))]
          (string/join \newline))))
+

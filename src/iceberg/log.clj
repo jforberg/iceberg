@@ -12,8 +12,8 @@
 (def ^:dynamic *verbosity* 0)
 
 (defn init! [config]
-  (def ^:dynamic *logfile* (io/writer (:log-file config) :append true))
-  (binding [*out* *logfile*]
+  ; (def ^:dynamic *logfile* (io/writer (:log-file config) :append true))
+  #_ (binding [*out* *logfile*]
     (println)
     (write (format "Init (iceberg %s)" (:command-line config))))
   (when (:interactive config)
@@ -22,6 +22,8 @@
     (def ^:dynamic *verbosity* 1)))
 
 (defn write
+  ([]
+   (write ""))
   ([^String s]
    (write s 0))
   ([^String s level]
