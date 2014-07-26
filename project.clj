@@ -12,5 +12,6 @@
                  [org.tukaani/xz "1.4"]]
   :profiles {:dev {:plugins [[lein-midje "3.1.0"]]
                    :dependencies [[midje "1.6.3"]
-                                  [org.clojure/tools.trace "0.7.6"]]}}
+                                  [org.clojure/tools.trace "0.7.6"]]}
+             :uberjar {:aot :all}}
   :main iceberg.core)
